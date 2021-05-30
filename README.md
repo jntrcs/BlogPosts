@@ -1,2 +1,4 @@
 # BlogPosts
-Code and research for blog posts (if I ever start one)
+Code and research for blog posts
+
+regression-to-the-mean: Posted May 29th, 2021
