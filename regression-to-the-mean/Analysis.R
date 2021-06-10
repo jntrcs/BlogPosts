@@ -16,7 +16,7 @@ teams %>% arrange(observed_skill) %>%
   scale_y_discrete(name="Mid Season Rank", labels=31:1)+
   theme_minimal()+
   #scale_color_taylor(palette = "taylorSwift")+
-  scale_color_manual(values=tayloRswift::swift_palettes$taylorSwift[c(1,6,4)])+
+  #scale_color_manual(values=tayloRswift::swift_palettes$taylorSwift[c(1,6,4)])+
   guides(color=guide_legend(title=NULL))+
   theme(legend.position = "bottom")+
   ggtitle("FG% as a Mixture of Skill and Luck")
