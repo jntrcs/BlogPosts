@@ -60,7 +60,7 @@ stan_rank = tibble(name = names(data_wide)[-c(1:4)], bad_calls_per_minute = appl
 
 stan_rank %>% arrange(bad_calls_per_minute) %>%
   ggplot(aes(y=fct_rev(fct_inorder(name))))+
-  geom_point(aes(x=bad_calls_per_minute*48))+
+  geom_col(aes(x=bad_calls_per_minute*48))+
   theme_minimal()+
   xlab("Expected number of bad calls in a 48 minute game by each official")+
   ylab(NULL)+
@@ -87,10 +87,11 @@ comp=stan_rank %>% left_join(no_model)
 comp_plot=ggplot(comp, aes(x=no_mod_rank, y=poisson_rank, text=paste0("Name: ", name, "\nMinutes Reffed: ", minutes),
                            label=name, size=minutes))+
   geom_point()+
-  geom_point(color="forestgreen", data=~.x%>%filter(name%in% c("JT Orr", "Eric Lewis", "Bill Spooner", "Pat Fraher")))+
+  geom_point(color="forestgreen", data=~.x%>%filter(name%in% c("JT Orr", "Eric Lewis", "Bill Spooner", "Pat Fraher",
+                                                               "CJ Washington")))+
   #ggrepel::geom_label_repel(data=~.x %>% filter(abs(no_mod_rank-poisson_rank)>20))+
   ylab("Bayesian Poisson Rank")+
-  xlab("No Model Rank")+
+  xlab("Simple Average Rank")+
   theme_minimal()+
   theme(legend.position = "bottom")+
   scale_y_continuous(breaks=seq(0, 80, 10), minor_breaks = seq(0, 80, 5))+
