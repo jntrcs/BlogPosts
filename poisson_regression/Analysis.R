@@ -50,16 +50,22 @@ stan_rank = tibble(name = names(data_wide)[-c(1:4)], bad_calls_per_minute = appl
                    bad_calls_median = apply(rs, 2, median),
                    lb = apply(a, 1, quantile, .025),
                    ub = apply(a, 1, quantile, .975),
-                   poisson_rank = rank(bad_calls_per_minute))
-
+                   poisson_rank = rank(bad_calls_per_minute)) %>%
+  left_join(
+    data_wide %>%
+     summarize(across(-c(1:4), ~sum(minutes[.x==1]))) %>%
+     pivot_longer(everything(),values_to="minutes")
+)
 
 
 stan_rank %>% arrange(bad_calls_per_minute) %>%
-  ggplot(aes(y=fct_inorder(name)))+
+  ggplot(aes(y=fct_rev(fct_inorder(name))))+
   geom_point(aes(x=bad_calls_per_minute*48))+
   theme_minimal()+
-  xlab("Bad Calls per 48 Minute Game")+
-  ylab(NULL)
+  xlab("Expected number of bad calls in a 48 minute game by each official")+
+  ylab(NULL)+
+  scale_x_continuous(limits = c(0, 21))+
+  ggtitle("Poisson Modeled Bad Call Rate", "For normal games with three officials")
 
 stan_rank %>% arrange(bad_calls_per_minute) %>%
   ggplot(aes(y=fct_inorder(name)))+
@@ -78,25 +84,47 @@ no_model=data_wide %>%
   mutate(no_mod_rank = nrow(.):1)
 
 comp=stan_rank %>% left_join(no_model)
-ggplot(comp, aes(x=no_mod_rank, y=poisson_rank))+geom_point()
+comp_plot=ggplot(comp, aes(x=no_mod_rank, y=poisson_rank, text=paste0("Name: ", name, "\nMinutes Reffed: ", minutes),
+                           label=name, size=minutes))+
+  geom_point()+
+  geom_point(color="forestgreen", data=~.x%>%filter(name%in% c("JT Orr", "Eric Lewis", "Bill Spooner", "Pat Fraher")))+
+  #ggrepel::geom_label_repel(data=~.x %>% filter(abs(no_mod_rank-poisson_rank)>20))+
+  ylab("Bayesian Poisson Rank")+
+  xlab("No Model Rank")+
+  theme_minimal()+
+  theme(legend.position = "bottom")+
+  scale_y_continuous(breaks=seq(0, 80, 10), minor_breaks = seq(0, 80, 5))+
+  scale_x_continuous(breaks=seq(0,80, 10), minor_breaks = seq(0, 80, 5))+
+  guides(size=guide_legend(title="Time in L2M Reports"), color=NULL)+
+  ggtitle("Naive vs. Modeled Ref Ranks")
+comp_plot
 
-ggplot(comp, aes(x=bad_calls_per_minute, y=value))+geom_point()
+p=plotly::ggplotly(comp_plot, tooltip = "text")
+p
+plotly::api_create(p, filename="Ranking_Comparisons")
 
-mod_lm = lm(ICs~.-minutes,
+ggplot(comp, aes(x=bad_calls_per_minute, y=value, size=minutes))+geom_point()+
+  ylab("Average number of bad calls when ref is reffing")+
+  xlab("Inferred bad call rate")+
+  theme(legend.position = "bottom")+
+  guides(size=guide_legend(title="Time in L2M Reports"))
+
+mod_lm = lm(ICs~-1+.-minutes,
           weights=data_wide$minutes,
           data=data_wide %>%
             select(-c(game_id, CCs)) %>%
             mutate(ICs=ICs/minutes))
 summary(mod_lm)
 
-lm_coefs = broom::tidy(mod_lm) %>% slice(-1) %>%
-  mutate(estimate= replace_na(estimate,0)) %>%
+lm_coefs = broom::tidy(mod_lm)  %>%
+  #mutate(estimate= replace_na(estimate,0)) %>%
   select(name=term, estimate) %>%
   mutate(name=substr(name, 2, nchar(name)-1))%>%
   arrange(estimate) %>%
-  mutate(lm_rank=1:nrow(.))
+  mutate(lm_rank=1:nrow(.)) %>%
+  rename(lm_estimate=estimate)
 
 
 comp = comp %>% left_join(lm_coefs)
-ggplot(comp, aes(y=rank, x=lm_rank))+
+ggplot(comp, aes(y=no_mod_rank, x=lm_rank))+
   geom_point()
