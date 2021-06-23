@@ -32,7 +32,7 @@ stan_data = list(refs = as.matrix(data_wide %>% select(-(1:4))),
                  N_refs = ncol(data_wide)-4)
 
 library(rstan)
-fit1 <- stan(
+fit1 <- stan(seed = 2,
   file = "PoissonModel.stan",  # Stan program
   data = stan_data,    # named list of data
   chains = 4,             # number of Markov chains
@@ -59,13 +59,17 @@ stan_rank = tibble(name = names(data_wide)[-c(1:4)], bad_calls_per_minute = appl
 
 
 stan_rank %>% arrange(bad_calls_per_minute) %>%
-  ggplot(aes(y=fct_rev(fct_inorder(name))))+
-  geom_col(aes(x=bad_calls_per_minute*48))+
+  ggplot(aes(y=fct_rev(fct_inorder(paste0("#", poisson_rank, " ", name)))))+
+  geom_col(aes(x=bad_calls_per_minute*48), fill="black", color="white")+
+  geom_point(color="darkorange", size=3, aes(x=bad_calls_per_minute*48))+
+  geom_point(color="black", size=.1, aes(x=bad_calls_per_minute*48))+
   theme_minimal()+
-  xlab("Expected number of bad calls in a 48 minute game by each official")+
+  xlab("Expected number of bad calls in a 48 minute game by official")+
   ylab(NULL)+
-  scale_x_continuous(limits = c(0, 21))+
-  ggtitle("Poisson Modeled Bad Call Rate", "For normal games with three officials")
+  scale_x_continuous(limits = c(0, 22), breaks=seq(0, 22, length.out=12))+
+  theme(axis.text.y = element_text(hjust=0), panel.grid.minor = element_blank())+
+  ggtitle("Modeled Bad Call Rate", "For normal games with three officials")+
+  ggsave(filename="Ranks.png", height=10, width=10)
 
 stan_rank %>% arrange(bad_calls_per_minute) %>%
   ggplot(aes(y=fct_inorder(name)))+
@@ -87,8 +91,8 @@ comp=stan_rank %>% left_join(no_model)
 comp_plot=ggplot(comp, aes(x=no_mod_rank, y=poisson_rank, text=paste0("Name: ", name, "\nMinutes Reffed: ", minutes),
                            label=name, size=minutes))+
   geom_point()+
-  geom_point(color="forestgreen", data=~.x%>%filter(name%in% c("JT Orr", "Eric Lewis", "Bill Spooner", "Pat Fraher",
-                                                               "CJ Washington")))+
+  geom_point(color="forestgreen", data=~.x%>%filter(name%in% c("JT Orr", "Leon Wood", "Bill Spooner", "Pat Fraher",
+                                                               "Nate Green")))+
   #ggrepel::geom_label_repel(data=~.x %>% filter(abs(no_mod_rank-poisson_rank)>20))+
   ylab("Bayesian Poisson Rank")+
   xlab("Simple Average Rank")+
