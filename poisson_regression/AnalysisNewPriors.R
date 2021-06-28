@@ -15,7 +15,7 @@ refs = read_csv("AllRefsAllGames.csv")
 refs_wide = refs %>%
   filter(game_id!="0022000215") %>% #Remove this row as some weird duplicate
   pivot_wider(id_cols=game_id, names_from=Position,
-                     values_from=Ref)
+              values_from=Ref)
 
 data= calls %>% left_join(refs_wide)
 
@@ -32,33 +32,33 @@ stan_data = list(refs = as.matrix(data_wide %>% select(-(1:4))),
                  N_refs = ncol(data_wide)-4)
 
 library(rstan)
-fit1 <- stan(seed = 2,
-  file = "PoissonModel.stan",  # Stan program
-  data = stan_data,    # named list of data
-  chains = 4,             # number of Markov chains
-  warmup = 4000,          # number of warmup iterations per chain
-  iter = 8000,            # total number of iterations per chain
-  cores = 4,              # number of cores (could use one per chain)
+fit2 <- stan(seed = 2,
+             file = "PoissonModelNewPriors.stan",  # Stan program
+             data = stan_data,    # named list of data
+             chains = 4,             # number of Markov chains
+             warmup = 5000,          # number of warmup iterations per chain
+             iter = 10000,            # total number of iterations per chain
+             cores = 4,              # number of cores (could use one per chain)
 )
 
-shinystan::launch_shinystan(fit1)
+shinystan::launch_shinystan(fit2)
 
-rs=rstan::extract(fit1, "r")$r
-a=apply(rs, 1, rank)
+rs_new=rstan::extract(fit2, "r")$r
+a=apply(rs_new, 1, rank)
 
-stan_rank = tibble(name = names(data_wide)[-c(1:4)], bad_calls_per_minute = apply(rs, 2, mean),
-                   bad_calls_median = apply(rs, 2, median),
+stan_rank_new = tibble(name = names(data_wide)[-c(1:4)], bad_calls_per_minute = apply(rs_new, 2, mean),
+                   bad_calls_median = apply(rs_new, 2, median),
                    lb = apply(a, 1, quantile, .025),
                    ub = apply(a, 1, quantile, .975),
                    poisson_rank = rank(bad_calls_per_minute)) %>%
   left_join(
     data_wide %>%
-     summarize(across(-c(1:4), ~sum(minutes[.x==1]))) %>%
-     pivot_longer(everything(),values_to="minutes")
-)
+      summarize(across(-c(1:4), ~sum(minutes[.x==1]))) %>%
+      pivot_longer(everything(),values_to="minutes")
+  )
 
 
-stan_rank %>% arrange(bad_calls_per_minute) %>%
+stan_rank_new %>% arrange(bad_calls_per_minute) %>%
   ggplot(aes(y=fct_rev(fct_inorder(paste0("#", poisson_rank, " ", name)))))+
   geom_col(aes(x=bad_calls_per_minute*48), fill="black", color="white")+
   geom_point(color="darkorange", size=3, aes(x=bad_calls_per_minute*48))+
@@ -66,10 +66,9 @@ stan_rank %>% arrange(bad_calls_per_minute) %>%
   theme_minimal()+
   xlab("Expected number of bad calls in a 48 minute game by official")+
   ylab(NULL)+
-  scale_x_continuous(limits = c(0, 22), breaks=seq(0, 22, length.out=12))+
+  scale_x_continuous(limits = c(0, 10), breaks=seq(0, 22, length.out=12))+
   theme(axis.text.y = element_text(hjust=0), panel.grid.minor = element_blank())+
-  ggtitle("Modeled Bad Call Rate", "For normal games with three officials")+
-  ggsave(filename="RanksFixedPrior.png", height=10, width=10)
+  ggtitle("Modeled Bad Call Rate", "For normal games with three officials")
 
 stan_rank %>% arrange(bad_calls_per_minute) %>%
   ggplot(aes(y=fct_inorder(name)))+
@@ -106,7 +105,6 @@ comp_plot
 
 p=plotly::ggplotly(comp_plot, tooltip = "text")
 p
-plotly::api_create(p, filename="Ranking_Comparisons")
 
 ggplot(comp, aes(x=bad_calls_per_minute, y=value, size=minutes))+geom_point()+
   ylab("Average number of bad calls when ref is reffing")+
@@ -115,10 +113,10 @@ ggplot(comp, aes(x=bad_calls_per_minute, y=value, size=minutes))+geom_point()+
   guides(size=guide_legend(title="Time in L2M Reports"))
 
 mod_lm = lm(ICs~-1+.-minutes,
-          weights=data_wide$minutes,
-          data=data_wide %>%
-            select(-c(game_id, CCs)) %>%
-            mutate(ICs=ICs/minutes))
+            weights=data_wide$minutes,
+            data=data_wide %>%
+              select(-c(game_id, CCs)) %>%
+              mutate(ICs=ICs/minutes))
 summary(mod_lm)
 
 lm_coefs = broom::tidy(mod_lm)  %>%

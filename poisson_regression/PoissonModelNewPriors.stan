@@ -11,6 +11,7 @@ data {
 parameters {
   vector<lower=0>[N_refs] r;
   real<lower=0> theta;
+  real<lower=0> sigma;
 }
 
 transformed parameters{
@@ -25,8 +26,7 @@ model {
   for (i in 1:N_games){
     target += poisson_lpmf(bad_calls[i] | mu[i]);
   }
-  target += exponential_lpdf(r | 1/theta);
-  target += exponential_lpdf(theta | 10);
-
+  target += normal_lpdf(r | theta, sigma);
+  target += normal_lpdf(theta | .2, .5);
+  target += normal_lpdf(sigma | 0, 1);
 }
-
