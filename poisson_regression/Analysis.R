@@ -50,6 +50,9 @@ stan_rank = tibble(name = names(data_wide)[-c(1:4)], bad_calls_per_minute = appl
                    bad_calls_median = apply(rs, 2, median),
                    lb = apply(a, 1, quantile, .025),
                    ub = apply(a, 1, quantile, .975),
+                   lb_calls = apply(rs, 2, quantile, .025),
+                   ub_calls=apply(rs, 2, quantile, .975),
+
                    poisson_rank = rank(bad_calls_per_minute)) %>%
   left_join(
     data_wide %>%
@@ -77,7 +80,17 @@ stan_rank %>% arrange(bad_calls_per_minute) %>%
   geom_errorbar(aes(xmin=lb, xmax=ub))+
   theme_minimal()+
   xlab("Possible Ref Rank")+
-  ylab(NULL)
+  ylab(NULL)+
+  ggtitle("95% CI on League Ranking")
+
+stan_rank %>% arrange(bad_calls_per_minute) %>%
+  ggplot(aes(y=fct_inorder(name)))+
+  geom_point(aes(x=bad_calls_per_minute*48))+
+  geom_errorbar(aes(xmin=lb_calls*48, xmax=ub_calls*48))+
+  theme_minimal()+
+  xlab("Bad Call per 48 Minute Rate")+
+  ylab(NULL)+
+  ggtitle("95% CI on Bad Call Rate")
 
 ##Helpful explanations
 
