@@ -1,0 +1,114 @@
+---
+title: "The Conditional Birthday Problem"
+author: "Jackson Curtis"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+
+
+Most people who have recently taken a statistics class have heard of ['The Birthday Problem,'](https://en.wikipedia.org/wiki/Birthday_problem) or the surprising fact that it only takes a group of 23 people to have a >50% chance of two people sharing a birthday. However, the mathematical framing of The Birthday Problem isn't quite the same as the logistical problem that might occur with a quickly growing Latter-Day Saint family when two kids from different sides of the family share a birthday. In the family case, you're not so much interested in "will a random group of x people have a birthday problem?" as "How many more people can we add until we create a birthday problem?" This second question conditions on the fact that your existing family does not yet have any birthday collisions. As I have gotten married and siblings on both sides have been starting and growing their families, the logistical issues that might arise when we have a "birthday problem" need to be considered.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.width=9,fig.height=8}
+library(tidyverse)
+library(lubridate)
+
+birthdays=tibble(birthday = c("2019-02-11", "2019-10-20", "2019-08-14", "2019-08-15",
+       "2019-06-01", "2019-01-06", "2019-05-03", "2019-04-29", "2019-01-20",
+       "2019-09-23", "2019-01-14", "2019-05-12", "2019-07-23", "2019-08-22",
+       "2019-01-29", "2019-12-18", "2019-08-04", "2019-12-17", "2019-05-14",
+       "2019-07-17", "2019-11-23", "2019-12-30")) %>%
+  mutate(birthday = ymd(birthday))
+
+
+## Thanks to Viet Le (https://vietle.info/post/calendarheatmap/) for the awesome calendar code!
+df  <-  tibble(
+  DateCol = seq(
+    dmy("01/01/2019"),
+    dmy("31/12/2019"),
+    "days"
+  ),
+  ValueCol=DateCol %in% birthdays$birthday
+)
+
+
+dfPlot <- df %>%
+  mutate(weekday = wday(DateCol, label = T, week_start = 7), # can put week_start = 1 to start week on Monday
+         month = month(DateCol, label = T),
+         date = yday(DateCol),
+         week = epiweek(DateCol))
+
+# isoweek makes the last week of the year as week 1, so need to change that to week 53 for the plot
+dfPlot$week[dfPlot$month=="Dec" & dfPlot$week ==1] = 53
+
+dfPlot <- dfPlot %>%
+  group_by(month) %>%
+  mutate(monthweek = 1 + week - min(week),
+         Day = as.character(day(DateCol)),
+         Day=if_else(DateCol=="2019-01-13", "??", Day))
+
+dfPlot %>%
+  ggplot(aes(weekday,-week, fill = ValueCol)) +
+  geom_tile(colour = "white")  +
+  geom_text(aes(label = Day), size = 2.5, color = "black") +
+  theme(aspect.ratio = 1/2,
+        legend.position = "top",
+        legend.key.width = unit(3, "cm"),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        axis.text.y = element_blank(),
+        panel.grid = element_blank(),
+        axis.ticks = element_blank(),
+        panel.background = element_blank(),
+        legend.title.align = 0.5,
+        strip.background = element_blank(),
+        strip.text = element_text(face = "bold", size = 15),
+        panel.border = element_rect(colour = "grey", fill=NA, size=1),
+        plot.title = element_text(hjust = 0.5, size = 21, face = "bold",
+                                  margin = margin(0,0,0.5,0, unit = "cm"))) +
+  facet_wrap(~month, nrow = 4, ncol = 3, scales = "free") +
+  labs(title = "Curtis/Yeates Birthday Calendar", 
+       caption="Thanks to Viet Le for the ggplot calendar code (https://vietle.info/post/calendarheatmap/)")+
+  scale_fill_manual(values=tayloRswift::swift_palettes$lover[c(2,4)])+
+  guides(fill=F)
+```
+
+My immediate family currently consists of 22 people, so it might seem like the birthday problem is right around the corner. However, that's not quite right. We need to condition on the fact that we have not yet experienced the birthday problem in order to calculate how long we can expect to avoid it. For example, the next person to join our family only has a $22/365 =  6\%$ chance of causing the birthday problem, so we are a long way away from having a 50%  chance of a birthday problem in our family by the time we reach 23 people. We can create a simple formula to calculate the probability of experiencing the Birthday problem in x additions to the family given n members of the family (who haven't doubled up) as follows:
+$$
+Pr(\text{birthday problem with x additions} | n) = 1-\frac{Pr(\text{no birthday problem with n+x people})}{Pr(\text{no birthday problem with n  people})} 
+$$
+
+We can then use the standard birthday problem formula to calculate the numerator and denominator:
+
+$$
+1-\frac{Pr(\text{no birthday problem with n+x people})}{Pr(\text{no birthday problem with n people})} =1- \frac{\frac{\frac{365!}{(n+x)!(365-n-x)!}}{365^{n+x}}}{\frac{\frac{365!}{n!(365-n)!}}{365^{n}}}
+$$
+
+
+
+```{r echo=FALSE, fig.width=9,fig.height=3.5}
+tibble(addition = 1:10) %>%
+  rowwise() %>%
+  mutate(prob = 1-(1-pbirthday(addition+22))/(1-pbirthday(22))) %>%
+  ggplot(aes(x=addition, y=prob))+geom_point()+geom_line()+
+  scale_y_continuous(name="Probability of Problem", labels=scales::label_percent(accuracy = 1),
+                     limits = c(0, .55), breaks=c(0,.1,.2,.3,.4,.5))+
+  scale_x_continuous(name="Family Additions", breaks=1:10)+theme_minimal()+
+  ggtitle("How long till we have a birthday problem?")
+```
+
+The chart above shows that we'll need 10 additional people (31 total) before we have a >50% chance of a birthday problem.
+
+### Accounting for all known information
+
+However, in stats, you should always account for (condition on) all the most relevant data you have, so all our calculations that assume random, evenly-distributed birthdates go out the window once you have a due date for a baby. For example, if a baby is due on January 13th, the most appropriate calculation to make is to look specifically at the days around January 13th that might cause a birthday problem, in our case: the 6th, 14th, and 20th. If we make a simplifying assumption that the baby is equally likely to come in the seven days before or after its due date, our new probability of creating a birthday problem is 3/15=20%.
+
+In conclusion, the 23rd addition to the family, Monica and Jackson's new baby, has a 20% chance of causing a birthday problem. 
+
+
+**Editor's note:** After writing this blog, our doctor informed us that the baby is not actually on track to be due until Jan. 26th
