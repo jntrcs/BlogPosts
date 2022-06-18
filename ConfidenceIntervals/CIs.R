@@ -2,6 +2,7 @@ library(tidyverse)
 library(MASS)
 
 set.seed(5)
+#simulate highly correlated xs and some y values
 data = MASS::mvrnorm(100, mu=c(0, 0), 
                      Sigma=matrix(c(1, .99, .99, 1), nrow=2, byrow=T)) %>%
   as_tibble %>% setNames(c("x1", "x2")) %>%
@@ -18,7 +19,9 @@ summary(model)
 confint(model)
 
 library(car)
-
+#There is probably a million better ways to calculate a confidence region
+#But I haven't used these types of models in a long time so I'm
+#going with something that works
 tests = expand.grid(x1=seq(0.5, 5, length.out=100), x2=seq(1.8, 6.5, length.out=100))
 test_res = tests %>% rowwise %>%
   mutate(hypothesis = list(linearHypothesis(model, c(glue::glue("x1={x1}"), glue::glue("x2={x2}")))))
